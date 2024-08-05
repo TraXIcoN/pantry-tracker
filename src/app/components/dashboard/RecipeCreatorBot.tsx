@@ -35,14 +35,19 @@ interface PantryItem {
 const RecipeCreatorBot: React.FC<{ pantryItems: PantryItem[] }> = ({
   pantryItems,
 }) => {
+  const [open, setOpen] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [recipe, setRecipe] = useState<string>("");
+
   const openaiApiKey = process.env.NEXT_PUBLIC_GPT_API_KEY;
   if (!openaiApiKey) {
     console.error("OpenAI API key is not set in environment variables.");
     return null;
   }
+
   const openai = new OpenAI({
     baseURL: "https://api.openai.com/v1",
-    apiKey: openaiApiKey,
+    apiKey: "openaiApiKey",
     dangerouslyAllowBrowser: true,
     defaultHeaders: {
       "HTTP-Referer": "",
@@ -50,7 +55,7 @@ const RecipeCreatorBot: React.FC<{ pantryItems: PantryItem[] }> = ({
     },
   });
 
-  const fetchRecipe = async () => {
+  const fetchRecipe = async (): Promise<string> => {
     try {
       const response = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
@@ -76,10 +81,6 @@ const RecipeCreatorBot: React.FC<{ pantryItems: PantryItem[] }> = ({
       return "Sorry, something went wrong. Please try again later.";
     }
   };
-
-  const [open, setOpen] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [recipe, setRecipe] = useState<string>("");
 
   const handleOpen = async () => {
     setOpen(true);
