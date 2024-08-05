@@ -9,6 +9,16 @@ import {
   CircularProgress,
 } from "@mui/material";
 import OpenAI from "openai";
+import { auth } from "../../../config/firebase";
+import { db } from "../../../config/firebase";
+import {
+  collection,
+  addDoc,
+  deleteDoc,
+  doc,
+  getDocs,
+  updateDoc,
+} from "firebase/firestore";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -69,21 +79,39 @@ const RecipeCreatorBot: React.FC<{ pantryItems: PantryItem[] }> = ({
 
   const [open, setOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
-  const [messages, setMessages] = useState<string[]>([]);
+  const [recipe, setRecipe] = useState<string>("");
 
   const handleOpen = async () => {
     setOpen(true);
     setLoading(true);
     const response = await fetchRecipe();
-    setMessages([`Bot: ${response}`]);
+    setRecipe(response);
     setLoading(false);
   };
 
   const handleClose = () => setOpen(false);
 
-  useEffect(() => {
-    setMessages([]);
-  }, []);
+  const saveRecipe = async () => {
+    const user = auth.currentUser;
+    if (user) {
+      try {
+        const recipeData = {
+          pantryItems,
+          recipe,
+          createdAt: new Date().toISOString(),
+        };
+        const recipesRef = collection(db, `userData/${user.uid}/recipes`);
+        await addDoc(recipesRef, recipeData);
+        alert("Recipe saved successfully!");
+        handleClose();
+      } catch (error) {
+        console.error("Error saving recipe:", error);
+        alert("There was an error saving the recipe. Please try again.");
+      }
+    } else {
+      alert("User not authenticated.");
+    }
+  };
 
   return (
     <>
@@ -104,14 +132,13 @@ const RecipeCreatorBot: React.FC<{ pantryItems: PantryItem[] }> = ({
             {loading ? (
               <CircularProgress />
             ) : (
-              messages.map((message, index) => (
-                <Typography key={index} sx={{ whiteSpace: "pre-line" }}>
-                  {message}
-                </Typography>
-              ))
+              <Typography sx={{ whiteSpace: "pre-line" }}>{recipe}</Typography>
             )}
           </Box>
-          <Button color="error" onClick={handleClose} variant="contained">
+          <Button onClick={saveRecipe} variant="contained" sx={{ mr: 2 }}>
+            Save Recipe
+          </Button>
+          <Button onClick={handleClose} variant="contained">
             Close
           </Button>
         </Box>

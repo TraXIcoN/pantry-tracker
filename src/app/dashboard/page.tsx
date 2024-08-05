@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import Header from "../components/Header";
 import PantryList from "../components/dashboard/PantryList";
+import SavedRecipes from "../components/dashboard/SavedRecipes";
 import { useAuth } from "../../../context/auth/AuthProvider";
 
 const Page = () => {
@@ -41,6 +42,7 @@ const Page = () => {
           </p>
         </div>
         <PantryList searchQuery={searchQuery} />
+        <SavedRecipes />
       </section>
       <div className="flex justify-center items-center">
         <span className="text-gray-400 font-Poppins text-sm">
