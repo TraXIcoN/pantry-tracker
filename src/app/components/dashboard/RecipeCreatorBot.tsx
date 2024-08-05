@@ -1,6 +1,13 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { Modal, Box, Typography, TextField, Button } from "@mui/material";
+import {
+  Modal,
+  Box,
+  Typography,
+  TextField,
+  Button,
+  CircularProgress,
+} from "@mui/material";
 import OpenAI from "openai";
 import dotenv from "dotenv";
 dotenv.config();
@@ -19,9 +26,13 @@ const RecipeCreatorBot: React.FC<{ pantryItems: PantryItem[] }> = ({
   pantryItems,
 }) => {
   const openaiApiKey = process.env.NEXT_PUBLIC_GPT_API_KEY;
+  if (!openaiApiKey) {
+    console.error("OpenAI API key is not set in environment variables.");
+    return null;
+  }
   const openai = new OpenAI({
-    baseURL: "https://openrouter.ai/api/v1",
-    apiKey: process.env.NEXT_PUBLIC_GPT_API_KEY,
+    baseURL: "https://api.openai.com/v1",
+    apiKey: openaiApiKey,
     dangerouslyAllowBrowser: true,
     defaultHeaders: {
       "HTTP-Referer": "",
@@ -32,7 +43,7 @@ const RecipeCreatorBot: React.FC<{ pantryItems: PantryItem[] }> = ({
   const fetchRecipe = async () => {
     try {
       const response = await openai.chat.completions.create({
-        model: "openai/gpt-4o",
+        model: "gpt-3.5-turbo",
         messages: [
           {
             role: "user",
@@ -57,12 +68,15 @@ const RecipeCreatorBot: React.FC<{ pantryItems: PantryItem[] }> = ({
   };
 
   const [open, setOpen] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
   const [messages, setMessages] = useState<string[]>([]);
 
   const handleOpen = async () => {
     setOpen(true);
+    setLoading(true);
     const response = await fetchRecipe();
     setMessages([`Bot: ${response}`]);
+    setLoading(false);
   };
 
   const handleClose = () => setOpen(false);
@@ -73,8 +87,13 @@ const RecipeCreatorBot: React.FC<{ pantryItems: PantryItem[] }> = ({
 
   return (
     <>
-      <Button onClick={handleOpen} variant="contained" disabled sx={{ mt: 9 }}>
-        Generate Recipe(Coming Soon)
+      <Button
+        onClick={handleOpen}
+        variant="contained"
+        color="error"
+        sx={{ mt: 9 }}
+      >
+        Generate Recipe
       </Button>
       <Modal open={open} onClose={handleClose}>
         <Box sx={{ ...modalStyle }}>
@@ -82,11 +101,17 @@ const RecipeCreatorBot: React.FC<{ pantryItems: PantryItem[] }> = ({
             Recipe Generator
           </Typography>
           <Box sx={{ maxHeight: "300px", overflowY: "auto", mb: 2 }}>
-            {messages.map((message, index) => (
-              <Typography key={index}>{message}</Typography>
-            ))}
+            {loading ? (
+              <CircularProgress />
+            ) : (
+              messages.map((message, index) => (
+                <Typography key={index} sx={{ whiteSpace: "pre-line" }}>
+                  {message}
+                </Typography>
+              ))
+            )}
           </Box>
-          <Button onClick={handleClose} variant="contained">
+          <Button color="error" onClick={handleClose} variant="contained">
             Close
           </Button>
         </Box>
