@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { FaTrash, FaEdit } from "react-icons/fa";
 import {
   Modal,
@@ -14,7 +14,7 @@ import {
 import { DatePicker } from "@mui/x-date-pickers";
 import { LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { auth } from "../../../config/firebase";
+import { auth, storage } from "../../../config/firebase";
 import { db } from "../../../config/firebase";
 import {
   collection,
@@ -27,6 +27,12 @@ import {
 import dayjs, { Dayjs } from "dayjs";
 import Webcam from "react-webcam";
 import RecipeCreatorBot from "./RecipeCreatorBot";
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+  deleteObject,
+} from "firebase/storage";
 
 interface PantryItem {
   id: string; // ID must be a string as Firestore IDs are strings
@@ -99,6 +105,11 @@ const PantryList: React.FC<PantryListProps> = ({ searchQuery }) => {
   const [selectedItem, setSelectedItem] = useState<PantryItem | null>(null);
   const [useCamera, setUseCamera] = useState(false); // State to toggle between camera and form
   const user = auth.currentUser;
+  const [pantryPics, setPantryPics] = useState<
+    { url: string; dateAdded: string }[]
+  >([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const handleOpen = () => {
     setIsEditing(false);
@@ -281,6 +292,87 @@ const PantryList: React.FC<PantryListProps> = ({ searchQuery }) => {
     setOpen(false);
   };
 
+  const handleChooseFromGallery = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Handle the file upload
+      handleUploadPicture(file);
+    }
+  };
+
+  const handleUploadPicture = async (file: File) => {
+    try {
+      if (user) {
+        const storageRef = ref(
+          storage,
+          `userData/${user.uid}/pantryPics/${file.name}`
+        );
+        await uploadBytes(storageRef, file);
+        const fileUrl = await getDownloadURL(storageRef);
+
+        // Save the file URL to Firestore
+        const pantryPicsRef = collection(db, `userData/${user.uid}/pantryPics`);
+        await addDoc(pantryPicsRef, {
+          url: fileUrl,
+          dateAdded: new Date().toISOString(),
+        });
+
+        // Fetch updated pantry pics
+        fetchPantryPics();
+      } else {
+        console.error("User not authenticated");
+        alert("User not authenticated. Please log in and try again.");
+      }
+    } catch (error) {
+      console.error("Error uploading picture:", error);
+      alert("There was an error uploading the picture. Please try again.");
+    }
+  };
+
+  const fetchPantryPics = async () => {
+    if (user) {
+      const pantryPicsRef = collection(db, `userData/${user.uid}/pantryPics`);
+      const snapshot = await getDocs(pantryPicsRef);
+      const pantryPicsData = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          url: data.url,
+          dateAdded: data.dateAdded,
+        };
+      });
+      setPantryPics(pantryPicsData);
+    }
+  };
+
+  useEffect(() => {
+    fetchPantryPics();
+  }, [user]);
+
+  const handleImageClick = (url: string) => {
+    setSelectedImage(url);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedImage(null);
+  };
+
+  const handleDeleteImage = async (url: string) => {
+    try {
+      const storageRef = ref(storage, url);
+      await deleteObject(storageRef);
+      setPantryPics((prevPics) => prevPics.filter((pic) => pic.url !== url));
+    } catch (error) {
+      console.error("Error deleting image:", error);
+      alert("There was an error deleting the image. Please try again.");
+    }
+  };
+
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs}>
       <section className=" relative p-4">
@@ -449,7 +541,7 @@ const PantryList: React.FC<PantryListProps> = ({ searchQuery }) => {
                   sx={{
                     ...buttonStyle,
                     marginRight: 1,
-                    backgroundColor: !useCamera ? "#007bff" : "#6c757d",
+                    backgroundColor: !useCamera ? "#990009" : "#6c757d",
                   }}
                 >
                   Use Form
@@ -463,11 +555,24 @@ const PantryList: React.FC<PantryListProps> = ({ searchQuery }) => {
                     backgroundColor: useCamera ? "#007bff" : "#6c757d",
                   }}
                 >
-                  Use Camera(Coming Soon in v2.0.0)
+                  Use Camera
                 </Button>
               </Box>
               {useCamera ? (
                 <>
+                  <Button
+                    variant="contained"
+                    onClick={handleChooseFromGallery}
+                    sx={{ ...buttonStyle, marginBottom: 2 }}
+                  >
+                    Choose from Gallery
+                  </Button>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    style={{ display: "none" }}
+                    onChange={handleFileChange}
+                  />
                   <Webcam
                     audio={false}
                     screenshotFormat="image/jpeg"
@@ -478,12 +583,18 @@ const PantryList: React.FC<PantryListProps> = ({ searchQuery }) => {
                     onUserMedia={() => console.log("Camera enabled")}
                     screenshotQuality={1}
                   />
-                  <DatePicker
-                    label="Expiry Date"
-                    value={expiryDate}
-                    sx={datePickerStyle}
-                    onChange={(newDate) => setExpiryDate(newDate)}
-                  />
+                  <Button
+                    variant="contained"
+                    sx={buttonStyle}
+                    onClick={() => {
+                      const imageSrc = webcamRef.current?.getScreenshot();
+                      if (imageSrc) {
+                        handleUploadPicture(imageSrc);
+                      }
+                    }}
+                  >
+                    Take Picture
+                  </Button>
                 </>
               ) : (
                 <>
@@ -544,7 +655,65 @@ const PantryList: React.FC<PantryListProps> = ({ searchQuery }) => {
             </Box>
           </Modal>
           <RecipeCreatorBot pantryItems={pantryItems} />
+          <div className="mt-8">
+            <h2 className="text-xl font-bold mb-4">
+              Scroll for Pantry Pictures
+            </h2>
+            <div className="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 auto-rows-auto">
+              {pantryPics.map((pic, index) => (
+                <div key={index} className="relative group w-full h-0 pb-full">
+                  <img
+                    src={pic.url}
+                    alt={`Pantry Pic ${index + 1}`}
+                    className="absolute top-0 left-0 w-60 h-60 object-cover rounded-lg shadow-md transition-opacity duration-300 group-hover:opacity-50"
+                    style={{ maxHeight: "348px" }}
+                  />
+                  <div className="absolute top-0 left-0 w-60 h-60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <button
+                      className="bg-blue-500 text-white px-4 py-2 rounded mr-2"
+                      onClick={() => handleImageClick(pic.url)}
+                    >
+                      View Image
+                    </button>
+                    <button
+                      className="bg-red-500 text-white px-4 py-2 rounded"
+                      onClick={() => handleDeleteImage(pic.url)}
+                    >
+                      Delete Image
+                    </button>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Added on: {new Date(pic.dateAdded).toLocaleDateString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
+        {selectedImage && (
+          <Modal open={!!selectedImage} onClose={handleCloseModal}>
+            <Box
+              sx={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                bgcolor: "background.paper",
+                boxShadow: 24,
+                p: 4,
+                maxWidth: "90%",
+                maxHeight: "90%",
+                overflow: "auto",
+              }}
+            >
+              <img
+                src={selectedImage}
+                alt="Selected Pantry Pic"
+                className="w-full h-auto"
+              />
+            </Box>
+          </Modal>
+        )}
       </section>
     </LocalizationProvider>
   );
