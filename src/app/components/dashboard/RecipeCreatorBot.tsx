@@ -47,7 +47,7 @@ const RecipeCreatorBot: React.FC<{ pantryItems: PantryItem[] }> = ({
 
   const openai = new OpenAI({
     baseURL: "https://api.openai.com/v1",
-    apiKey: "openaiApiKey",
+    apiKey: openaiApiKey,
     dangerouslyAllowBrowser: true,
     defaultHeaders: {
       "HTTP-Referer": "",
@@ -71,7 +71,12 @@ const RecipeCreatorBot: React.FC<{ pantryItems: PantryItem[] }> = ({
 
       if (response.choices && response.choices.length > 0) {
         const recipe = response.choices[0].message.content;
-        return recipe;
+        if (recipe !== null) {
+          return recipe;
+        } else {
+          console.error("Recipe content is null:", response);
+          return "Sorry, no recipe could be generated. Please try again later.";
+        }
       } else {
         console.error("No choices returned in the response:", response);
         return "Sorry, no recipe could be generated. Please try again later.";
