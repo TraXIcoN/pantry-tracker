@@ -110,6 +110,25 @@ const PantryList: React.FC<PantryListProps> = ({ searchQuery }) => {
   >([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const webcamRef = useRef<Webcam>(null); // Define webcamRef
+
+  // Utility function to convert base64 to Blob
+  const base64ToBlob = (base64: string, contentType = "", sliceSize = 512) => {
+    const byteCharacters = atob(base64.split(",")[1]);
+    const byteArrays = [];
+
+    for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+      const slice = byteCharacters.slice(offset, offset + sliceSize);
+      const byteNumbers = new Array(slice.length);
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      byteArrays.push(byteArray);
+    }
+
+    return new Blob(byteArrays, { type: contentType });
+  };
 
   const handleOpen = () => {
     setIsEditing(false);
@@ -285,11 +304,29 @@ const PantryList: React.FC<PantryListProps> = ({ searchQuery }) => {
     }
   };
 
-  const handleTakePicture = (imageSrc: string) => {
-    // Handle the image taken from the camera
-    console.log("Image captured:", imageSrc);
-    // You can store this image or perform other actions
-    setOpen(false);
+  const makeid = (length: number) => {
+    let result = "";
+    const characters =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    const charactersLength = characters.length;
+    let counter = 0;
+    while (counter < length) {
+      result += characters.charAt(Math.floor(Math.random() * charactersLength));
+      counter += 1;
+    }
+    return result;
+  };
+
+  const handleTakePicture = () => {
+    const imageSrc = webcamRef.current?.getScreenshot();
+    if (imageSrc) {
+      console.log("Captured Image:", imageSrc); // Log the captured image
+      const imageBlob = base64ToBlob(imageSrc, "image/jpeg");
+      const file = new File([imageBlob], `screenshot${makeid(10)}.jpeg`, {
+        type: "image/jpeg",
+      });
+      handleUploadPicture(file);
+    }
   };
 
   const handleChooseFromGallery = () => {
@@ -575,6 +612,7 @@ const PantryList: React.FC<PantryListProps> = ({ searchQuery }) => {
                   />
                   <Webcam
                     audio={false}
+                    ref={webcamRef} // Attach webcamRef to Webcam component
                     screenshotFormat="image/jpeg"
                     width="100%"
                     height="auto"
@@ -586,12 +624,7 @@ const PantryList: React.FC<PantryListProps> = ({ searchQuery }) => {
                   <Button
                     variant="contained"
                     sx={buttonStyle}
-                    onClick={() => {
-                      const imageSrc = webcamRef.current?.getScreenshot();
-                      if (imageSrc) {
-                        handleUploadPicture(imageSrc);
-                      }
-                    }}
+                    onClick={handleTakePicture} // Use handleTakePicture function
                   >
                     Take Picture
                   </Button>
@@ -659,16 +692,15 @@ const PantryList: React.FC<PantryListProps> = ({ searchQuery }) => {
             <h2 className="text-xl font-bold mb-4">
               Scroll for Pantry Pictures
             </h2>
-            <div className="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 auto-rows-auto">
+            <div className="flex gap-4 overflow-x-scroll min-h-72">
               {pantryPics.map((pic, index) => (
-                <div key={index} className="relative group w-full h-0 pb-full">
+                <div key={index} className="relative group pb-full">
                   <img
                     src={pic.url}
                     alt={`Pantry Pic ${index + 1}`}
-                    className="absolute top-0 left-0 w-60 h-60 object-cover rounded-lg shadow-md transition-opacity duration-300 group-hover:opacity-50"
-                    style={{ maxHeight: "348px" }}
+                    className="w-60 h-60 object-cover rounded-lg shadow-md transition-opacity duration-300 group-hover:opacity-50"
                   />
-                  <div className="absolute top-0 left-0 w-60 h-60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <button
                       className="bg-blue-500 text-white px-4 py-2 rounded mr-2"
                       onClick={() => handleImageClick(pic.url)}

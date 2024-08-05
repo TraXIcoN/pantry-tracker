@@ -46,7 +46,7 @@ const Page = () => {
       </section>
       <div className="flex justify-center items-center">
         <span className="text-gray-400 font-Poppins text-sm">
-          *Camera and recipe generation AI coming soon in v2.0.0*
+          *Camera AI coming soon in v2.0.0*
         </span>
       </div>
     </section>
