@@ -37,7 +37,7 @@ const Page = () => {
             {customGreeting}, <span className="font-bold">{userName}</span>
           </h1>
           <p className="font-Poppins text-sm font-normal text-gray-500">
-            Your pantry in a nutshell—thrilling, isn't it?
+            Your pantry in a nutshell—thrilling, isn&#39;t it?
           </p>
         </div>
         <PantryList searchQuery={searchQuery} />

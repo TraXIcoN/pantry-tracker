@@ -77,7 +77,7 @@ export default function Home() {
             className="font-Poppins font-semibold text-5xl md:text-[4rem] text-black leading-tight"
           >
             Track, manage, and enjoy your perfectly organized pantry—because
-            that's everyone's dream, right?
+            that&#39;s everyone&#39;s dream, right?
           </motion.h1>
           <motion.p
             initial={{
